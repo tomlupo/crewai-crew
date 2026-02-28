@@ -36,5 +36,5 @@ python3 -m src.main "Research AI tools and write a blog post"
 
 ## API Keys
 
-- `ANTHROPIC_API_KEY` — Required. Get from https://console.anthropic.com
-- `SERPER_API_KEY` — Required for web search. Get from https://serper.dev
+- `OPENROUTER_API_KEY` — Required. Get from https://openrouter.ai
+- `BRAVE_API_KEY` — Required for web search. Get from https://brave.com/search/api

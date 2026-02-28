@@ -1,7 +1,7 @@
 """Agent definitions for the content/marketing crew."""
 
 from crewai import Agent, LLM
-from crewai_tools import SerperDevTool, ScrapeWebsiteTool
+from crewai_tools import BraveSearchTool, ScrapeWebsiteTool
 
 # LLM instances via OpenRouter — one per cost tier
 opus = LLM(model="openrouter/anthropic/claude-opus-4-6", temperature=0.3)
@@ -9,7 +9,7 @@ sonnet = LLM(model="openrouter/anthropic/claude-sonnet-4-6", temperature=0.7)
 haiku = LLM(model="openrouter/anthropic/claude-haiku-4-5", temperature=0.3)
 
 # Shared tool instances
-search_tool = SerperDevTool()
+search_tool = BraveSearchTool()
 scrape_tool = ScrapeWebsiteTool()
 
 
