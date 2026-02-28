@@ -1,11 +1,10 @@
-"""Crew orchestration — assembles agents and tasks into a hierarchical crew."""
+"""Crew orchestration — assembles agents and tasks into a sequential crew."""
 
 import logging
 
 from crewai import Crew, Process
 
 from src.agents import (
-    create_editor_in_chief,
     create_researcher,
     create_seo_strategist,
     create_social_monitor,
@@ -46,7 +45,6 @@ def run_content_crew(
         Final synthesized output from the crew.
     """
     # Create agents
-    editor = create_editor_in_chief()
     researcher = create_researcher()
     writer = create_writer()
 
@@ -57,7 +55,7 @@ def run_content_crew(
     research_task = create_research_task(topic=task_description, agent=researcher)
     tasks.append(research_task)
 
-    # SEO task (optional)
+    # SEO task (optional) — runs after research, before writing
     if include_seo:
         seo = create_seo_strategist()
         agents.append(seo)
@@ -73,7 +71,7 @@ def run_content_crew(
         )
         tasks.append(social_task)
 
-    # Writing task runs after research
+    # Writing task runs last — gets context from all previous tasks
     writing_task = create_writing_task(
         topic=task_description,
         content_type=content_type,
@@ -84,12 +82,12 @@ def run_content_crew(
     )
     tasks.append(writing_task)
 
-    # Assemble crew with hierarchical process
+    # Sequential process: Research → SEO → Write
+    # (Claude 4.6 doesn't support assistant prefill required by hierarchical mode)
     crew = Crew(
         agents=agents,
         tasks=tasks,
-        process=Process.hierarchical,
-        manager_agent=editor,
+        process=Process.sequential,
         verbose=True,
     )
 
