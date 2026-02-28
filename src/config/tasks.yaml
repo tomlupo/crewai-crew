@@ -1,0 +1,57 @@
+research_task:
+  description: >
+    Research the following topic thoroughly: {topic}
+
+    Find current, accurate information from multiple web sources.
+    Focus on: key facts, recent developments, notable players, and data points.
+  expected_output: >
+    A structured research brief with:
+    - Summary (2-3 sentences)
+    - Key Findings (bullet points with specifics)
+    - Data/Comparisons (table if applicable)
+    - Sources (URLs for every claim)
+  agent: researcher
+
+writing_task:
+  description: >
+    Write {content_type} about: {topic}
+
+    Use the research findings provided by the researcher as your source material.
+    Target platform: {platform}
+    Target audience: {audience}
+    Tone: {tone}
+  expected_output: >
+    Publish-ready {content_type} with:
+    - Compelling headline
+    - Well-structured body
+    - Clear call-to-action if appropriate
+    - Formatted for {platform}
+  agent: writer
+
+seo_task:
+  description: >
+    Analyze and provide SEO optimization for content about: {topic}
+
+    Research target keywords, analyze search intent, and suggest optimizations.
+  expected_output: >
+    SEO optimization brief with:
+    - Primary keyword and 3-5 secondary keywords
+    - Search intent analysis
+    - Suggested meta title (under 60 chars)
+    - Suggested meta description (under 160 chars)
+    - Content optimization recommendations
+  agent: seo_strategist
+
+social_monitoring_task:
+  description: >
+    Monitor and report on social/news activity related to: {topic}
+
+    Search for recent mentions, competitor activity, and emerging trends.
+  expected_output: >
+    Social intelligence report with:
+    - Alert level (urgent/notable/routine)
+    - Key mentions and their sentiment
+    - Competitor activity summary
+    - Emerging trends
+    - Recommended actions
+  agent: social_monitor
