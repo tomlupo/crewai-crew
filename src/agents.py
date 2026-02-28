@@ -1,7 +1,7 @@
 """Agent definitions for the content/marketing crew."""
 
 from crewai import Agent, LLM
-from crewai_tools import SerperDevTool, ScrapeWebsiteTool, WebsiteSearchTool
+from crewai_tools import SerperDevTool, ScrapeWebsiteTool
 
 # LLM instances — one per cost tier
 opus = LLM(model="anthropic/claude-opus-4-6", temperature=0.3)
@@ -11,7 +11,6 @@ haiku = LLM(model="anthropic/claude-haiku-4-5", temperature=0.3)
 # Shared tool instances
 search_tool = SerperDevTool()
 scrape_tool = ScrapeWebsiteTool()
-website_search_tool = WebsiteSearchTool()
 
 
 def create_editor_in_chief() -> Agent:
@@ -50,7 +49,7 @@ def create_researcher() -> Agent:
             "without a URL to back it up."
         ),
         llm=haiku,
-        tools=[search_tool, scrape_tool, website_search_tool],
+        tools=[search_tool, scrape_tool],
         allow_delegation=False,
         verbose=True,
     )
