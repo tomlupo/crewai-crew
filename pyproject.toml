@@ -1,0 +1,11 @@
+[project]
+name = "crewai-content-crew"
+version = "0.1.0"
+description = "Content/marketing multi-agent crew powered by CrewAI and Anthropic Claude"
+requires-python = ">=3.11"
+dependencies = [
+    "crewai[tools]>=0.100.0",
+    "crewai-tools>=0.30.0",
+    "streamlit>=1.40.0",
+    "python-dotenv>=1.0.0",
+]
