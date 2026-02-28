@@ -12,6 +12,43 @@ load_dotenv()
 
 from src.crew import run_content_crew
 
+HTML_CONTENT_TYPES = {"landing page", "html page", "webpage", "website"}
+
+
+def is_html_output(content_type: str, result: str) -> bool:
+    """Check if the crew output is HTML."""
+    return (
+        content_type in HTML_CONTENT_TYPES
+        or "<!doctype html>" in result[:300].lower()
+        or "<html" in result[:300].lower()
+    )
+
+
+def strip_code_fences(text: str) -> str:
+    """Remove markdown code fences if the model wrapped the output."""
+    t = text.strip()
+    if t.startswith("```html"):
+        t = t[7:].strip()
+    elif t.startswith("```"):
+        t = t[3:].strip()
+    if t.endswith("```"):
+        t = t[:-3].strip()
+    return t
+
+
+def save_output_file(result: str, content_type: str, task_id: int) -> Path:
+    """Save crew output to a file in output/."""
+    output_dir = Path("output")
+    output_dir.mkdir(exist_ok=True)
+    if is_html_output(content_type, result):
+        result = strip_code_fences(result)
+        filepath = output_dir / f"crew-output-{task_id}.html"
+    else:
+        filepath = output_dir / f"crew-output-{task_id}.md"
+    filepath.write_text(result, encoding="utf-8")
+    return filepath
+
+
 DB_PATH = Path("output/history.db")
 
 
@@ -133,7 +170,17 @@ if "view_task_id" in st.session_state:
             f"{task['duration_seconds']:.0f}s" if task["duration_seconds"] else "—",
         )
         st.markdown("---")
-        st.markdown(task["result"] or "*No result yet*")
+        if task["result"] and is_html_output(task["content_type"], task["result"]):
+            clean = strip_code_fences(task["result"])
+            st.components.v1.html(clean, height=800, scrolling=True)
+            st.download_button(
+                "📥 Download HTML",
+                data=clean,
+                file_name=f"crew-output-{task['id']}.html",
+                mime="text/html",
+            )
+        else:
+            st.markdown(task["result"] or "*No result yet*")
     if st.button("← Back to new task"):
         del st.session_state["view_task_id"]
         st.rerun()
@@ -152,6 +199,7 @@ else:
                 "Content type",
                 [
                     "blog post",
+                    "landing page",
                     "Twitter/X thread",
                     "LinkedIn post",
                     "newsletter",
@@ -160,7 +208,7 @@ else:
             )
             platform = st.selectbox(
                 "Platform",
-                ["blog", "twitter", "linkedin", "newsletter", "internal"],
+                ["blog", "website", "twitter", "linkedin", "newsletter", "internal"],
             )
         with col2:
             include_seo = st.checkbox("Include SEO optimization", value=True)
@@ -198,11 +246,26 @@ else:
         if result:
             st.markdown("---")
             st.subheader("Result")
-            st.markdown(result)
 
-            st.download_button(
-                "📥 Download as Markdown",
-                data=result,
-                file_name=f"crew-output-{task_id}.md",
-                mime="text/markdown",
-            )
+            filepath = save_output_file(result, content_type, task_id)
+            html_output = is_html_output(content_type, result)
+
+            if html_output:
+                clean_html = strip_code_fences(result)
+                st.components.v1.html(clean_html, height=800, scrolling=True)
+                st.download_button(
+                    "📥 Download HTML",
+                    data=clean_html,
+                    file_name=filepath.name,
+                    mime="text/html",
+                )
+            else:
+                st.markdown(result)
+                st.download_button(
+                    "📥 Download Markdown",
+                    data=result,
+                    file_name=filepath.name,
+                    mime="text/markdown",
+                )
+
+            st.success(f"Saved to {filepath}")
