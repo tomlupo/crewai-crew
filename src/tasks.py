@@ -32,22 +32,53 @@ def create_writing_task(
     tone: str = "informative and engaging",
 ) -> Task:
     """Create a content writing task."""
-    return Task(
-        description=(
+    is_html = content_type in ("landing page", "html page", "webpage", "website")
+    if is_html:
+        description = (
+            f"Build a {content_type} about: {topic}\n\n"
+            "Use the research findings and SEO recommendations from prior tasks.\n"
+            f"Target audience: {audience}\n"
+            f"Tone: {tone}\n\n"
+            "OUTPUT REQUIREMENTS:\n"
+            "- Output a COMPLETE, single-file HTML document (<!DOCTYPE html> to </html>)\n"
+            "- Include all CSS inline in a <style> tag — no external stylesheets\n"
+            "- Modern, responsive design with mobile-first approach\n"
+            "- Professional color palette, clean typography (use Google Fonts via CDN)\n"
+            "- Hero section with headline and CTA button\n"
+            "- Benefits/features section with icons or cards\n"
+            "- Social proof / stats section\n"
+            "- Final CTA section\n"
+            "- Smooth scroll, subtle animations (CSS only)\n"
+            "- DO NOT output markdown. Output raw HTML only."
+        )
+        expected_output = (
+            "A complete, self-contained HTML file with:\n"
+            "- <!DOCTYPE html> declaration\n"
+            "- Embedded CSS in <style> tags\n"
+            "- Responsive layout that works on mobile and desktop\n"
+            "- Hero, benefits, stats, and CTA sections\n"
+            "- Professional visual design\n"
+            "- NO markdown wrapping — raw HTML only"
+        )
+    else:
+        description = (
             f"Write a {content_type} about: {topic}\n\n"
             "Use the research findings provided by the researcher as your "
             "source material.\n"
             f"Target platform: {platform}\n"
             f"Target audience: {audience}\n"
             f"Tone: {tone}"
-        ),
-        expected_output=(
+        )
+        expected_output = (
             f"Publish-ready {content_type} with:\n"
             "- Compelling headline\n"
             "- Well-structured body\n"
             "- Clear call-to-action if appropriate\n"
             f"- Formatted for {platform}"
-        ),
+        )
+    return Task(
+        description=description,
+        expected_output=expected_output,
         agent=agent,
     )
 
