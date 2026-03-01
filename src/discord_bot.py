@@ -25,7 +25,6 @@ from src.db import (
     is_html_output,
     save_output_file,
     save_task,
-    strip_code_fences,
     update_task,
 )
 
@@ -267,7 +266,6 @@ async def send_result(
     html = is_html_output(content_type, result)
 
     if html:
-        clean = strip_code_fences(result)
         await message.reply(
             f"Here's your {content_type}:",
             file=discord.File(fp=filepath, filename=filepath.name),
