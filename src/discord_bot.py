@@ -6,12 +6,13 @@ Run with: python -m src.discord_bot
 """
 
 import asyncio
+import json
 import logging
 import os
-import re
 import time
 
 import discord
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -36,16 +37,18 @@ logger = logging.getLogger("discord_bot")
 
 BOT_TOKEN = os.environ["DISCORD_BOT_TOKEN"]
 CHANNEL_ID = int(os.environ["DISCORD_CHANNEL_ID"])
+OPENROUTER_API_KEY = os.environ["OPENROUTER_API_KEY"]
 
-# --- Content type detection ---
+# --- Content type detection via LLM ---
 
-CONTENT_TYPE_PATTERNS = {
-    "landing page": re.compile(r"\blanding\s*page\b", re.IGNORECASE),
-    "Twitter/X thread": re.compile(r"\b(twitter|tweet|x\s*thread)\b", re.IGNORECASE),
-    "LinkedIn post": re.compile(r"\blinkedin\b", re.IGNORECASE),
-    "newsletter": re.compile(r"\bnewsletter\b", re.IGNORECASE),
-    "report": re.compile(r"\breport\b", re.IGNORECASE),
-}
+VALID_CONTENT_TYPES = [
+    "blog post",
+    "landing page",
+    "Twitter/X thread",
+    "LinkedIn post",
+    "newsletter",
+    "report",
+]
 
 PLATFORM_MAP = {
     "landing page": "website",
@@ -56,18 +59,71 @@ PLATFORM_MAP = {
     "blog post": "blog",
 }
 
+CLASSIFY_SYSTEM = """You are a content task classifier. Given a user message, determine what type of content they want and extract a clean task description.
 
-def detect_content_type(text: str) -> str:
-    """Detect content type from message text via keyword matching."""
-    for content_type, pattern in CONTENT_TYPE_PATTERNS.items():
-        if pattern.search(text):
-            return content_type
-    return "blog post"
+Respond with ONLY a JSON object (no markdown fences, no explanation).
+Fields:
+- "content_type": one of "blog post", "landing page", "Twitter/X thread", "LinkedIn post", "newsletter", "report"
+- "platform": one of "blog", "website", "twitter", "linkedin", "newsletter", "internal"
+- "description": a clean task description for a content creation crew
+
+Rules:
+- webpage / HTML page / landing page → "landing page" / "website"
+- Twitter / X / tweet / thread → "Twitter/X thread" / "twitter"
+- LinkedIn → "LinkedIn post" / "linkedin"
+- newsletter / email → "newsletter" / "newsletter"
+- report / analysis / internal doc → "report" / "internal"
+- anything else or general requests → "blog post" / "blog"
+- The description should be a clear content brief, even if the user's message is casual or vague"""
 
 
-def detect_platform(content_type: str) -> str:
-    """Map content type to platform."""
-    return PLATFORM_MAP.get(content_type, "blog")
+async def classify_message(text: str) -> dict:
+    """Use Haiku via OpenRouter to classify the message intent."""
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "anthropic/claude-haiku-4-5",
+                    "messages": [
+                        {"role": "system", "content": CLASSIFY_SYSTEM},
+                        {"role": "user", "content": text},
+                    ],
+                    "temperature": 0,
+                    "max_tokens": 200,
+                },
+            )
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"]["content"].strip()
+            # Strip markdown fences if model wraps the JSON
+            if content.startswith("```"):
+                # Remove opening fence (```json or ```) and closing fence
+                lines = content.split("\n")
+                # Drop first line (```json) and last line (```)
+                inner = "\n".join(
+                    line for line in lines if not line.strip().startswith("```")
+                )
+                content = inner.strip()
+            parsed = json.loads(content)
+            # Validate content_type
+            if parsed.get("content_type") not in VALID_CONTENT_TYPES:
+                parsed["content_type"] = "blog post"
+            if parsed.get("platform") not in PLATFORM_MAP.values():
+                parsed["platform"] = PLATFORM_MAP.get(parsed["content_type"], "blog")
+            if not parsed.get("description"):
+                parsed["description"] = text
+            return parsed
+    except Exception as e:
+        logger.warning("LLM classification failed: %s: %s", type(e).__name__, e)
+        return {
+            "content_type": "blog post",
+            "platform": "blog",
+            "description": text,
+        }
 
 
 # --- Discord bot ---
@@ -92,6 +148,13 @@ async def on_ready():
 
 @client.event
 async def on_message(message: discord.Message):
+    logger.debug(
+        "on_message: channel=%s author=%s content=%r",
+        message.channel.id,
+        message.author,
+        message.content[:80] if message.content else "(empty)",
+    )
+
     # Ignore own messages
     if message.author == client.user:
         return
@@ -107,6 +170,7 @@ async def on_message(message: discord.Message):
     # Ignore very short messages (likely not a task)
     text = message.content.strip()
     if len(text) < 10:
+        logger.info("Ignoring short message (%d chars): %r", len(text), text)
         return
 
     active_messages.add(message.id)
@@ -118,8 +182,11 @@ async def on_message(message: discord.Message):
 
 async def process_task(message: discord.Message, text: str):
     """Run the crew for a Discord message and post the result."""
-    content_type = detect_content_type(text)
-    platform = detect_platform(content_type)
+    # Classify the message with LLM
+    classification = await classify_message(text)
+    content_type = classification["content_type"]
+    platform = classification["platform"]
+    description = classification["description"]
 
     # Reply with status
     status_msg = await message.reply(
@@ -129,7 +196,7 @@ async def process_task(message: discord.Message, text: str):
     # Save to shared DB
     init_db()
     task_id = save_task(
-        description=text,
+        description=description,
         content_type=content_type,
         platform=platform,
         include_seo=True,
@@ -137,10 +204,11 @@ async def process_task(message: discord.Message, text: str):
     )
 
     logger.info(
-        "Task #%d started for message %s from %s",
+        "Task #%d started for message %s from %s: %s",
         task_id,
         message.id,
         message.author,
+        description[:80],
     )
 
     # Run the blocking crew in a thread executor
@@ -151,7 +219,7 @@ async def process_task(message: discord.Message, text: str):
         result = await loop.run_in_executor(
             None,
             lambda: run_content_crew(
-                task_description=text,
+                task_description=description,
                 content_type=content_type,
                 platform=platform,
                 include_seo=True,
