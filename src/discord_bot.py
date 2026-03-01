@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.crew import run_content_crew
+from src.quant_crew import run_quant_crew
 from src.db import (
     init_db,
     is_html_output,
@@ -59,22 +60,28 @@ PLATFORM_MAP = {
     "blog post": "blog",
 }
 
-CLASSIFY_SYSTEM = """You are a content task classifier. Given a user message, determine what type of content they want and extract a clean task description.
+CLASSIFY_SYSTEM = """You are a task classifier that routes requests to either a content creation crew or a quantitative research crew.
 
 Respond with ONLY a JSON object (no markdown fences, no explanation).
 Fields:
+- "crew": "quant" or "content"
 - "content_type": one of "blog post", "landing page", "Twitter/X thread", "LinkedIn post", "newsletter", "report"
 - "platform": one of "blog", "website", "twitter", "linkedin", "newsletter", "internal"
-- "description": a clean task description for a content creation crew
+- "description": a clean task description
+- "tickers": list of stock ticker symbols mentioned or implied (e.g. ["NVDA", "AAPL"]). Empty list if none.
 
-Rules:
+Crew routing rules:
+- Use "quant" when the request involves: stock tickers, financial metrics, earnings, revenue, valuation, market cap, P/E ratio, EPS, margins, stock analysis, company financials, "analyze a company", price performance, investment analysis
+- Use "content" for everything else: blog posts, landing pages, marketing content, general writing
+
+Content type rules:
 - webpage / HTML page / landing page → "landing page" / "website"
 - Twitter / X / tweet / thread → "Twitter/X thread" / "twitter"
 - LinkedIn → "LinkedIn post" / "linkedin"
 - newsletter / email → "newsletter" / "newsletter"
 - report / analysis / internal doc → "report" / "internal"
 - anything else or general requests → "blog post" / "blog"
-- The description should be a clear content brief, even if the user's message is casual or vague"""
+- The description should be a clear brief, even if the user's message is casual or vague"""
 
 
 async def classify_message(text: str) -> dict:
@@ -109,6 +116,9 @@ async def classify_message(text: str) -> dict:
                 )
                 content = inner.strip()
             parsed = json.loads(content)
+            # Validate crew
+            if parsed.get("crew") not in ("quant", "content"):
+                parsed["crew"] = "content"
             # Validate content_type
             if parsed.get("content_type") not in VALID_CONTENT_TYPES:
                 parsed["content_type"] = "blog post"
@@ -116,13 +126,17 @@ async def classify_message(text: str) -> dict:
                 parsed["platform"] = PLATFORM_MAP.get(parsed["content_type"], "blog")
             if not parsed.get("description"):
                 parsed["description"] = text
+            if not isinstance(parsed.get("tickers"), list):
+                parsed["tickers"] = []
             return parsed
     except Exception as e:
         logger.warning("LLM classification failed: %s: %s", type(e).__name__, e)
         return {
+            "crew": "content",
             "content_type": "blog post",
             "platform": "blog",
             "description": text,
+            "tickers": [],
         }
 
 
@@ -184,14 +198,22 @@ async def process_task(message: discord.Message, text: str):
     """Run the crew for a Discord message and post the result."""
     # Classify the message with LLM
     classification = await classify_message(text)
+    crew_type = classification["crew"]
     content_type = classification["content_type"]
     platform = classification["platform"]
     description = classification["description"]
+    tickers = classification["tickers"]
 
     # Reply with status
-    status_msg = await message.reply(
-        f"**Working on it...** (type: {content_type}, platform: {platform})"
-    )
+    if crew_type == "quant":
+        ticker_str = ", ".join(tickers) if tickers else "none"
+        status_msg = await message.reply(
+            f"**Working on it...** (Quant Research crew | type: {content_type}, tickers: {ticker_str})"
+        )
+    else:
+        status_msg = await message.reply(
+            f"**Working on it...** (Content crew | type: {content_type}, platform: {platform})"
+        )
 
     # Save to shared DB
     init_db()
@@ -199,13 +221,15 @@ async def process_task(message: discord.Message, text: str):
         description=description,
         content_type=content_type,
         platform=platform,
-        include_seo=True,
+        include_seo=(crew_type == "content"),
         include_social=False,
+        crew_type=crew_type,
     )
 
     logger.info(
-        "Task #%d started for message %s from %s: %s",
+        "Task #%d started (crew=%s) for message %s from %s: %s",
         task_id,
+        crew_type,
         message.id,
         message.author,
         description[:80],
@@ -216,16 +240,27 @@ async def process_task(message: discord.Message, text: str):
     start_time = time.time()
 
     try:
-        result = await loop.run_in_executor(
-            None,
-            lambda: run_content_crew(
-                task_description=description,
-                content_type=content_type,
-                platform=platform,
-                include_seo=True,
-                include_social=False,
-            ),
-        )
+        if crew_type == "quant":
+            result = await loop.run_in_executor(
+                None,
+                lambda: run_quant_crew(
+                    task_description=description,
+                    tickers=tickers or None,
+                    content_type=content_type,
+                    platform=platform,
+                ),
+            )
+        else:
+            result = await loop.run_in_executor(
+                None,
+                lambda: run_content_crew(
+                    task_description=description,
+                    content_type=content_type,
+                    platform=platform,
+                    include_seo=True,
+                    include_social=False,
+                ),
+            )
         duration = time.time() - start_time
         update_task(task_id, result, "complete", duration)
         logger.info("Task #%d completed in %.0fs", task_id, duration)

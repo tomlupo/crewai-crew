@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.crew import run_content_crew
+from src.quant_crew import run_quant_crew
 from src.db import (
     is_html_output,
     strip_code_fences,
@@ -75,12 +76,29 @@ if "view_task_id" in st.session_state:
         st.rerun()
 else:
     # New task form
+    crew_mode = st.radio(
+        "Crew",
+        ["Content", "Quant Research"],
+        horizontal=True,
+    )
+
     with st.form("task_form"):
-        description = st.text_area(
-            "What do you need?",
-            placeholder="Research AI coding tools and write a blog post about them",
-            height=100,
-        )
+        if crew_mode == "Content":
+            description = st.text_area(
+                "What do you need?",
+                placeholder="Research AI coding tools and write a blog post about them",
+                height=100,
+            )
+        else:
+            description = st.text_area(
+                "What do you need?",
+                placeholder="Analyze NVIDIA's financials and write a LinkedIn post",
+                height=100,
+            )
+            tickers_input = st.text_input(
+                "Tickers (comma-separated)",
+                placeholder="NVDA, AAPL, MSFT",
+            )
 
         col1, col2 = st.columns(2)
         with col1:
@@ -100,28 +118,57 @@ else:
                 ["blog", "website", "twitter", "linkedin", "newsletter", "internal"],
             )
         with col2:
-            include_seo = st.checkbox("Include SEO optimization", value=True)
-            include_social = st.checkbox("Include social monitoring", value=False)
+            if crew_mode == "Content":
+                include_seo = st.checkbox("Include SEO optimization", value=True)
+                include_social = st.checkbox("Include social monitoring", value=False)
 
         submitted = st.form_submit_button("🚀 Run Crew", type="primary")
 
     if submitted and description:
+        crew_type = "quant" if crew_mode == "Quant Research" else "content"
+        if crew_mode != "Content":
+            include_seo = False
+            include_social = False
+
         task_id = save_task(
-            description, content_type, platform, include_seo, include_social
+            description,
+            content_type,
+            platform,
+            include_seo,
+            include_social,
+            crew_type=crew_type,
         )
 
-        with st.status("Crew is working...", expanded=True) as status:
-            st.write("Editor-in-Chief is analyzing the task...")
+        crew_label = "Quant Research crew" if crew_type == "quant" else "Content crew"
+        with st.status(f"{crew_label} is working...", expanded=True) as status:
+            st.write(f"Running {crew_label}...")
             start_time = time.time()
 
             try:
-                result = run_content_crew(
-                    task_description=description,
-                    content_type=content_type,
-                    platform=platform,
-                    include_seo=include_seo,
-                    include_social=include_social,
-                )
+                if crew_type == "quant":
+                    tickers = (
+                        [
+                            t.strip().upper()
+                            for t in tickers_input.split(",")
+                            if t.strip()
+                        ]
+                        if tickers_input
+                        else None
+                    )
+                    result = run_quant_crew(
+                        task_description=description,
+                        tickers=tickers,
+                        content_type=content_type,
+                        platform=platform,
+                    )
+                else:
+                    result = run_content_crew(
+                        task_description=description,
+                        content_type=content_type,
+                        platform=platform,
+                        include_seo=include_seo,
+                        include_social=include_social,
+                    )
                 duration = time.time() - start_time
                 update_task(task_id, result, "complete", duration)
                 status.update(label="Crew finished!", state="complete")

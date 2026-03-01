@@ -10,14 +10,17 @@ def create_research_task(topic: str, agent: Agent) -> Task:
             f"Research the following topic thoroughly: {topic}\n\n"
             "Find current, accurate information from multiple web sources. "
             "Focus on: key facts, recent developments, notable players, "
-            "and data points."
+            "and data points.\n\n"
+            "REQUIRED OUTPUT FORMAT:\n"
+            "STATUS: done\n"
+            "SUMMARY: <2-3 sentence overview of findings>\n"
+            "KEY_FINDINGS: <bullet points with specifics>\n"
+            "DATA: <data points, comparisons, or table>\n"
+            "SOURCES: <URLs for every claim>"
         ),
         expected_output=(
-            "A structured research brief with:\n"
-            "- Summary (2-3 sentences)\n"
-            "- Key Findings (bullet points with specifics)\n"
-            "- Data/Comparisons (table if applicable)\n"
-            "- Sources (URLs for every claim)"
+            "A structured research brief with STATUS: done and KEY: value output "
+            "including SUMMARY, KEY_FINDINGS, DATA, and SOURCES."
         ),
         agent=agent,
     )
@@ -49,16 +52,14 @@ def create_writing_task(
             "- Social proof / stats section\n"
             "- Final CTA section\n"
             "- Smooth scroll, subtle animations (CSS only)\n"
-            "- DO NOT output markdown. Output raw HTML only."
+            "- DO NOT output markdown. Output raw HTML only.\n\n"
+            "REQUIRED OUTPUT FORMAT:\n"
+            "STATUS: done\n"
+            "CONTENT: <the complete HTML document from <!DOCTYPE html> to </html>>"
         )
         expected_output = (
-            "A complete, self-contained HTML file with:\n"
-            "- <!DOCTYPE html> declaration\n"
-            "- Embedded CSS in <style> tags\n"
-            "- Responsive layout that works on mobile and desktop\n"
-            "- Hero, benefits, stats, and CTA sections\n"
-            "- Professional visual design\n"
-            "- NO markdown wrapping — raw HTML only"
+            "A complete, self-contained HTML file with STATUS: done and "
+            "CONTENT: containing the full HTML document."
         )
     else:
         description = (
@@ -67,14 +68,14 @@ def create_writing_task(
             "source material.\n"
             f"Target platform: {platform}\n"
             f"Target audience: {audience}\n"
-            f"Tone: {tone}"
+            f"Tone: {tone}\n\n"
+            "REQUIRED OUTPUT FORMAT:\n"
+            "STATUS: done\n"
+            "CONTENT: <the full publish-ready content>"
         )
         expected_output = (
-            f"Publish-ready {content_type} with:\n"
-            "- Compelling headline\n"
-            "- Well-structured body\n"
-            "- Clear call-to-action if appropriate\n"
-            f"- Formatted for {platform}"
+            f"Publish-ready {content_type} with STATUS: done and "
+            f"CONTENT: containing the complete piece formatted for {platform}."
         )
     return Task(
         description=description,
@@ -89,15 +90,19 @@ def create_seo_task(topic: str, agent: Agent) -> Task:
         description=(
             f"Analyze and provide SEO optimization for content about: {topic}\n\n"
             "Research target keywords, analyze search intent, and suggest "
-            "optimizations."
+            "optimizations.\n\n"
+            "REQUIRED OUTPUT FORMAT:\n"
+            "STATUS: done\n"
+            "PRIMARY_KEYWORD: <main target keyword>\n"
+            "SECONDARY_KEYWORDS: <3-5 secondary keywords, comma-separated>\n"
+            "SEARCH_INTENT: <analysis of user search intent>\n"
+            "META_TITLE: <suggested meta title, under 60 chars>\n"
+            "META_DESCRIPTION: <suggested meta description, under 160 chars>\n"
+            "RECOMMENDATIONS: <content optimization recommendations>"
         ),
         expected_output=(
-            "SEO optimization brief with:\n"
-            "- Primary keyword and 3-5 secondary keywords\n"
-            "- Search intent analysis\n"
-            "- Suggested meta title (under 60 chars)\n"
-            "- Suggested meta description (under 160 chars)\n"
-            "- Content optimization recommendations"
+            "SEO optimization brief with STATUS: done and KEY: value output "
+            "including PRIMARY_KEYWORD, META_TITLE, META_DESCRIPTION, and RECOMMENDATIONS."
         ),
         agent=agent,
     )
@@ -108,15 +113,18 @@ def create_social_monitoring_task(topic: str, agent: Agent) -> Task:
     return Task(
         description=(
             f"Monitor and report on social/news activity related to: {topic}\n\n"
-            "Search for recent mentions, competitor activity, and emerging trends."
+            "Search for recent mentions, competitor activity, and emerging trends.\n\n"
+            "REQUIRED OUTPUT FORMAT:\n"
+            "STATUS: done\n"
+            "ALERT_LEVEL: <urgent/notable/routine>\n"
+            "MENTIONS: <key mentions and their sentiment>\n"
+            "COMPETITOR_ACTIVITY: <competitor activity summary>\n"
+            "TRENDS: <emerging trends>\n"
+            "ACTIONS: <recommended actions>"
         ),
         expected_output=(
-            "Social intelligence report with:\n"
-            "- Alert level (urgent/notable/routine)\n"
-            "- Key mentions and their sentiment\n"
-            "- Competitor activity summary\n"
-            "- Emerging trends\n"
-            "- Recommended actions"
+            "Social intelligence report with STATUS: done and KEY: value output "
+            "including ALERT_LEVEL, MENTIONS, TRENDS, and ACTIONS."
         ),
         agent=agent,
     )

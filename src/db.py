@@ -59,20 +59,35 @@ def init_db():
             include_social INTEGER NOT NULL,
             result TEXT,
             status TEXT NOT NULL DEFAULT 'running',
-            duration_seconds REAL
+            duration_seconds REAL,
+            crew_type TEXT NOT NULL DEFAULT 'content'
         )
         """
     )
+    # Migration for existing databases missing the crew_type column
+    try:
+        conn.execute(
+            "ALTER TABLE tasks ADD COLUMN crew_type TEXT NOT NULL DEFAULT 'content'"
+        )
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     conn.commit()
     conn.close()
 
 
-def save_task(description, content_type, platform, include_seo, include_social):
+def save_task(
+    description,
+    content_type,
+    platform,
+    include_seo,
+    include_social,
+    crew_type="content",
+):
     """Save a new task to the database. Returns the task ID."""
     conn = sqlite3.connect(str(DB_PATH))
     cursor = conn.execute(
         "INSERT INTO tasks (created_at, description, content_type, platform, "
-        "include_seo, include_social) VALUES (?, ?, ?, ?, ?, ?)",
+        "include_seo, include_social, crew_type) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (
             datetime.now(timezone.utc).isoformat(),
             description,
@@ -80,6 +95,7 @@ def save_task(description, content_type, platform, include_seo, include_social):
             platform,
             int(include_seo),
             int(include_social),
+            crew_type,
         ),
     )
     task_id = cursor.lastrowid
